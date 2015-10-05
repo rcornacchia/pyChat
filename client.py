@@ -1,14 +1,15 @@
 import socket
-import sys
 
+port = int(sys.argv[1])
+host = socket.gethostname()
+server_address = (host, port)
 
-if __name__ == "__main__":
-    s = socket.socket()
-    host = socket.gethostname()
-    port = int(sys.argv[1])
-    s.connect((host, port))
+# Create socket
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    print s.recv(1024)
-    username = raw_input(s.recv(1024))
+# Connect to server port
+sock.connect(server_address)
+print "connecting to server"
 
-    s.send(username)
+greetings = "My name is Rob"
+sock.send(str.encode(greetings))
