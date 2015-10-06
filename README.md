@@ -18,6 +18,9 @@ In order to run:
 
 
 
+
+
+
 ##server.py:
 
 001    Reads list of username-password combinations from "user_pass.txt"
@@ -29,6 +32,8 @@ In order to run:
           for 60 seconds (60 seconds should be stored in variable "BLOCK_TIME" so that it can be easily changed)
 005    After the user is logged in, the server should be able to recognize + respond to specific user commands.
         If the server cannot recognize some command, an error message should be displayed.
+
+
 
 ##Commands:
 
@@ -44,3 +49,7 @@ wholast <time in minutes between 0-60>  Displays name of those users connected w
 client.py:
 
 001     When
+ 
+
+TODO
+test on clic server with appropriate python version
