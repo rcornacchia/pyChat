@@ -6,7 +6,7 @@
 import socket
 import sys
 import thread
-
+import signal
 
 def authenticateClient(conn, addr):
         print "Client connected: " + addr[0] + " : " + str(addr[1])
@@ -33,6 +33,9 @@ def authenticateClient(conn, addr):
                                 if str(data) == str(users.get(uname)):
                                         # User has logged in
                                         conn.send(str.encode("Welcome to the chat server"))
+                                        # Remove client from clients dict
+                                        del clients[conn]
+                                        # Add user to activeUsers
                                         activeUsers[uname] = [conn, addr]
                                         print "\nCURENTLY ACTIVE USERS"
                                         print activeUsers.keys()
@@ -83,36 +86,66 @@ def handleUser(conn, addr, uname):
 
                         elif command == "broadcast":
                                 if commands[1] == "user":
+                                        msg = ""
                                         for command in commands:
                                                 if users.has_key(command):
                                                         # broadcast to specific users
                                                         broadcastTo.append(command)
+                                                else:
+                                                        msg += command + " "
+                                        if len(broadcastTo > 0):
+
+                                        else:
+                                                msg = "Incorrect usage of broadcast, please add a message after listing users\n"
+                                                conn.send(str.encode(msg))
                                 elif commands[1] == "message":
                                         # broadcast to all
 
-                                        #create message
+                                        # create message
                                         msg = str(uname + ": ")
                                         for x in range(2, len(commands)):
                                                 msg += commands[x] + " "
 
                                         for user in activeUsers:
                                                 # user[0].send(str.encode(msg))
-                                                temp = activeUsers[user]
-                                                temp[0].send(str.encode(msg))
+
+                                                activeUsers[user][0].send(str.encode(msg))
+                                else:
+                                        msg = "Incorrect use of broadcast\n"
+                                        msg = msg + "broa"
+                                        conn.send(str.encode("Incorrect usage of broadcast\nBroadcast + message"))
                         elif command == "message":
-                                print "message"
+                                # create message for specific user
+                                msg = str(uname + ": ")
+                                for x in range(2, len(commands)):
+                                        msg += commands[x] + " "
+                                target = commands[1]
+                                activeUsers[target][0].send(str.encode(msg))
                         elif command == "logout":
                                 del activeUsers[uname]
                                 conn.send(str.encode("LOGOUT"))
                                 thread.exit()
-
-
-                        # elif command == wholast <time in minutes between 0-60>
-
                         else:
-                                conn.send(str.encode("Error: %s is not a valid command" % command))
+                                conn.send(str.encode("Error: %s is not a valid command\nEnter 'help' for a list of valid commands" % command))
 
-# Read list of usernmae-password combinations
+#signal handling
+def signal_handler(signal, frame):
+        print '\nYou pressed Ctrl+C!\nServer Shutting Down\n'
+        if len(activeUsers) is not 0:
+                for client in activeUsers:
+                        msg = "SERVER_SHUTDOWN"
+                        activeUsers[client][0].send(str.encode(msg))
+                        print "User: %s has been logged out" % activeUsers[client]
+                # For clients that haven't been
+                for client in clients:
+                        msg = "SERVER_SHUTDOWN"
+                        client.send(str.encode(msg))
+        sys.exit(0)
+signal.signal(signal.SIGINT, signal_handler)
+# signal.pause()
+
+
+# Read list of username-password combinations
 f = open("user_pass.txt", "r")
 raw_txt = f.read()
 f.close()
@@ -129,6 +162,7 @@ for i in slices:
 
 # Create a list of all users that are logged in
 activeUsers = {}
+clients = {}
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # server.setblocking(0)
@@ -148,7 +182,11 @@ server.listen(10)
 print "\n\nWaiting for connections on port %s" % (port)
 
 while 1:
+        # accept new client
         conn, addr = server.accept()
+        # Add client to list of clients
+        clients[conn] = addr
+        # Spawn a new thread to handle client
         thread.start_new_thread(authenticateClient, (conn, addr))
 
 server.close()
