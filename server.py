@@ -1,7 +1,11 @@
+# Robert Cornacchia
+# rlc2160
+# Python multithreading server
+
+
 import socket
 import sys
 import thread
-
 
 
 def authenticateClient(conn, addr):
@@ -17,13 +21,9 @@ def authenticateClient(conn, addr):
         loggedIn = False
         loginAttempt = 0
         while 1:
-                # if recvdCorrectName == False:
-
-                # elif recvdPass == False:
-                        # conn.send(str.encode("Enter password: "))
                 data = conn.recv(1024)
                 data = str(data)
-                print "\n DATA RECEIVED " + data + "  END TRANSMISSION\n"
+                print "\n DATA RECEIVED " + data + " END TRANSMISSION\n"
                 if not data:
                         break
                 else:
@@ -33,11 +33,10 @@ def authenticateClient(conn, addr):
                                 if str(data) == str(users.get(uname)):
                                         # User has logged in
                                         conn.send(str.encode("Welcome to the chat server"))
-                                        activeUsers.append(uname)
+                                        activeUsers[uname] = [conn, addr]
                                         print "\nCURENTLY ACTIVE USERS"
-                                        print activeUsers
-                                        print
-                                        handleUser(conn, addr)
+                                        print activeUsers.keys()
+                                        handleUser(conn, addr, uname)
                                 elif loginAttempt < 2:
                                         print "BAD LOGIN ATTEMPT"
                                         loginAttempt += 1
@@ -57,18 +56,61 @@ def authenticateClient(conn, addr):
                                 conn.send(str.encode("User does not exist\nEnter correct username"))
 
 
-def handleUser(conn, addr):
+def handleUser(conn, addr, uname):
+        while 1:
+                # Broadcast user has logged in
+                data = conn.recv(1024)
+                data = str(data)
+                if not data:
+                        break
+                else:
+                        commands = data.split(' ')
+                        broadcastTo = []
+                        command = str(commands[0])
+                        if command == "whoelse":
+                                others = "\nOthers in the chat:\n"
+                                for person in activeUsers:
+                                        if person is not uname:
+                                                    others = others + "\n" + person
+                                if others == "\nOthers in the chat:\n":
+                                        others = "\nThere is no one else here.\n"
+                                conn.send(str.encode(others))
+                        elif command == "wholast":
+                                #get number: commands[1]
+                                #0 < number < 60
+                                #use timestamp and function that iterates through ActiveUsers and time they logged in
+                                print "wholast"
 
-    while 1:
+                        elif command == "broadcast":
+                                if commands[1] == "user":
+                                        for command in commands:
+                                                if users.has_key(command):
+                                                        # broadcast to specific users
+                                                        broadcastTo.append(command)
+                                elif commands[1] == "message":
+                                        # broadcast to all
 
-            # Broadcast user has logged in
-            data = conn.recv(1024)
-            data = str(data)
-            if not data:
-                    break
-            print str(data)
-        # conn.close()
+                                        #create message
+                                        msg = str(uname + ": ")
+                                        for x in range(2, len(commands)):
+                                                msg += commands[x] + " "
 
+                                        for user in activeUsers:
+                                                # user[0].send(str.encode(msg))
+                                                temp = activeUsers[user]
+                                                temp[0].send(str.encode(msg))
+                        elif command == "message":
+                                print "message"
+                        elif command == "logout":
+                                del activeUsers[uname]
+                                conn.send(str.encode("LOGOUT"))
+                                thread.exit()
+
+
+                        # elif command == wholast <time in minutes between 0-60>
+
+                        else:
+                                conn.send(str.encode("Error: %s is not a valid command" % command))
 
 # Read list of usernmae-password combinations
 f = open("user_pass.txt", "r")
@@ -86,10 +128,10 @@ for i in slices:
                 users[key] = val
 
 # Create a list of all users that are logged in
-activeUsers = []
+activeUsers = {}
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-#server.setblocking(0)
+# server.setblocking(0)
 
 host = socket.gethostname()
 port = int(sys.argv[1])
