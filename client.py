@@ -1,3 +1,6 @@
+# Robert Cornacchia
+# rlc2160
+# Python client
 import socket
 import sys
 import select
@@ -21,9 +24,16 @@ sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # Connect to server port
 sock.connect(server_address)
 # print "Connected to Server at %s" % server_address
+
+loggedIn = False
+
 while 1:
-        sys.stdout.write("")
-        sys.stdout.flush()
+        if loggedIn:
+                sys.stdout.write("Command: ")
+                sys.stdout.flush()
+        else:
+                sys.stdout.write("")
+                sys.stdout.flush()
 
         (sread, swrite, sexc) = select.select([0, sock], [],[])
         for s in sread:
@@ -56,10 +66,9 @@ while 1:
                                         timeout += 1
                                         if timeout > 10:
                                                 sock.send(str.encode("LOGOUT"))
-                                                print("ERROR: pipe may be broken")
+                                                print("\nServer not responding\nShutting Down")
                                                 sock.close()
                                                 sys.exit()
-                                        print "nothing"
                                         break
                                 elif data == "SERVER_SHUTDOWN":
                                         print "Server shutting down\nYou have been logged out."
@@ -74,6 +83,8 @@ while 1:
                                         data = str(data).strip() + " "
                                         sys.stdout.write(data)
                                         sys.stdout.flush()
+                                elif data == "You have logged in. Welcome!":
+                                        loggedIn = True
                                 else:
                                         sys.stdout.write('\n' + data + '\n')
                                         sys.stdout.flush()

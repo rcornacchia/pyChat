@@ -2,12 +2,12 @@
 # rlc2160
 # Python multithreading server
 
-
-import  socket,
-        sys,
-        time,
-        thread,
-        signal
+import socket
+import sys
+import datetime
+import thread
+import signal
+import errno
 
 def authenticateClient(conn, addr):
         print "Client connected: " + addr[0] + " : " + str(addr[1])
@@ -26,6 +26,7 @@ def authenticateClient(conn, addr):
                 data = str(data)
                 print "\n DATA RECEIVED " + data + " END TRANSMISSION\n"
                 if not data:
+                        print "TESTAAAA"
                         break
                 else:
                         print str(data)
@@ -61,11 +62,23 @@ def authenticateClient(conn, addr):
 
 
 def handleUser(conn, addr, uname):
+        timeSinceLastMessage = 0
         while 1:
                 # Broadcast user has logged in
                 data = conn.recv(1024)
                 data = str(data)
                 if not data:
+                        print "Broken pipe"
+                        if len(activeUsers) is not 0:
+                                for client in activeUsers:
+                                        msg = "SERVER_SHUTDOWN"
+                                        activeUsers[client][0].send(str.encode(msg))
+                                        print "User: %s has been logged out" % client
+                        # For clients that logged in yet
+                        for client in clients:
+                                msg = "SERVER_SHUTDOWN"
+                                client.send(str.encode(msg))
+                        Sys.exit()
                         break
                 else:
                         commands = data.split(' ')
@@ -81,6 +94,11 @@ def handleUser(conn, addr, uname):
                                 conn.send(str.encode(others))
                         elif command == "wholast":
                                 # get number: commands[1]
+                                time = commands[1]
+                                if len(commands) > 2:
+                                        msg = "Incorrect usage of wholast\n"
+                                        msg = "Correct usage is wholast <number>\n"
+                                        conn.send(msg)
                                 # 0 < number < 60
                                 # use timestamp and function that iterates through activeUsers and time they logged in
                                 print "wholast"
@@ -140,10 +158,12 @@ def handleUser(conn, addr, uname):
                                         conn.send(str.encode(target + " is not logged in currently."))
                         elif command == "logout":
                                 del activeUsers[uname]
+                                timeTable[uname] = datetime.datetime.now()
                                 conn.send(str.encode("LOGOUT"))
                                 thread.exit()
                         elif command == "SHUT_DOWN":
                                 del activeUsers[uname]
+                                timeTable[uname] = datetime.datetime.now()
                                 thread.exit()
                         else:
                                 conn.send(str.encode("Error: %s is not a valid command\nEnter 'help' for a list of valid commands" % command))
@@ -163,22 +183,28 @@ def signal_handler(signal, frame):
                         client.send(str.encode(msg))
                 except socket.error, e:
                         if isinstance(e.args, tuple):
-                                print "errno is %d" % e[0]
+                                # print "errno is %d" % e[0]
                                 if e[0] == errno.EPIPE:
                                         # remote peer disconnected
-                                        print "Detected remote disconnect"
+                                        print "Detected remote disconnect from client"
                                 else:
                                         # determine and handle different error
                                         pass
                         else:
                                 print "socket error ", e
-                                remote.close()
+                                conn.close()
                                 break
                 except IOError, e:
                         print "IOError:, ", e
                         break
+                else:
+                        sys.exit(0)
         sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
+
+def shutDown():
+        print "Server shutting down"
+        sys.exit()
 
 if not sys.argv[1]:
         print "Incorrect usage"
@@ -201,6 +227,7 @@ for i in slices:
 # Create a list of all users that are logged in
 activeUsers = {}
 clients = {}
+timeTable = {}
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # server.setblocking(0)
