@@ -1,21 +1,28 @@
 import socket
 import sys
 import select
+import signal
 
-timeout = 10
+#signal handling
+def signal_handler(signal, frame):
+        print '\nYou pressed Ctrl+C!\nShutting Down\n'
+        sock.send(str.encode("SHUT_DOWN"))
+        sock.close()
+        sys.exit()
+signal.signal(signal.SIGINT, signal_handler)
+
+timeout = 0
 port = int(sys.argv[1])
 host = socket.gethostname()
 server_address = (host, port)
 
 # Create socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-print "TEST"
 # Connect to server port
 sock.connect(server_address)
 # print "Connected to Server at %s" % server_address
-print "TEST"
 while 1:
-        sys.stdout.write("> ")
+        sys.stdout.write("")
         sys.stdout.flush()
 
         (sread, swrite, sexc) = select.select([0, sock], [],[])
@@ -25,46 +32,49 @@ while 1:
             	        if data:
                                 sock.sendall(data)
             	elif s == sock:
-                        data = sock.recv(1024)
-                        if not data:
+                        try:
+                                data = sock.recv(1024)
+                        except socket.error, e:
+                                if isinstance(e.args, tuple):
+                                        print "errno is %d" % e[0]
+                                        if e[0] == errno.EPIPE:
+                                                # remote peer disconnected
+                                                print "Detected remote disconnect"
+                                        else:
+                                                # determine and handle different error
+                                                pass
+                                else:
+                                        print "socket error ", e
+                                        remote.close()
+                                        break
+                        except IOError, e:
+                                print "IOError:, ", e
                                 break
-                        elif data == "SERVER_SHUTDOWN":
-                                print "Server shutting down\nYou have been logged out."
-                                sock.close()
-                                sys.exit()
-                        elif data == "LOGOUT":
-                                print "You are successfully logged out"
-                                sock.close()
-                                sys.exit()
                         else:
-                                sys.stdout.write(data + '\n')
-                                sys.stdout.flush()
+                                # data = sock.recv(1024)
+                                if not data:
+                                        timeout += 1
+                                        if timeout > 10:
+                                                sock.send(str.encode("LOGOUT"))
+                                                print("ERROR: pipe may be broken")
+                                                sock.close()
+                                                sys.exit()
+                                        print "nothing"
+                                        break
+                                elif data == "SERVER_SHUTDOWN":
+                                        print "Server shutting down\nYou have been logged out."
+                                        sock.close()
+                                        sys.exit()
+                                elif data == "LOGOUT":
+                                        print "You are successfully logged out"
+                                        sock.close()
+                                        sys.exit()
 
-
-        # Could use keyboard interrupt to spawn new thread and handle user input
-        # add queue so that all messages can be handled
-
-
-
-        #
-        #
-        # data = sock.recv(1024)
-        # if not data:
-        #         break
-        # print str(data)
-        # if data == "LOGOUT":
-        #         print "You have been successfully logged out"
-        #         sock.close()
-        #         sys.exit()
-        # msg = raw_input("")
-        # if not msg:
-        #         break
-        # else:
-        #         sock.send(str.encode(msg))
-
-
-
-
-
-
+                                elif data == "Username:" or data == "Password:":
+                                        data = str(data).strip() + " "
+                                        sys.stdout.write(data)
+                                        sys.stdout.flush()
+                                else:
+                                        sys.stdout.write('\n' + data + '\n')
+                                        sys.stdout.flush()
 sock.close()

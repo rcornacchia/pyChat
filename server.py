@@ -3,16 +3,17 @@
 # Python multithreading server
 
 
-import socket
-import sys
-import thread
-import signal
+import  socket,
+        sys,
+        time,
+        thread,
+        signal
 
 def authenticateClient(conn, addr):
         print "Client connected: " + addr[0] + " : " + str(addr[1])
 
         # Ask client for username
-        conn.send(str.encode("Enter username: "))
+        conn.send(str.encode("Username:").strip())
 
         uname = ""
         recvdUsername = False
@@ -32,7 +33,7 @@ def authenticateClient(conn, addr):
                         if recvdCorrectName:
                                 if str(data) == str(users.get(uname)):
                                         # User has logged in
-                                        conn.send(str.encode("Welcome to the chat server"))
+                                        conn.send(str.encode("You have logged in. Welcome!"))
                                         # Remove client from clients dict
                                         del clients[conn]
                                         # Add user to activeUsers
@@ -43,7 +44,7 @@ def authenticateClient(conn, addr):
                                 elif loginAttempt < 2:
                                         print "BAD LOGIN ATTEMPT"
                                         loginAttempt += 1
-                                        conn.send(str.encode("Incorrect Password\nYou have " + str(3-loginAttempt) + " attempts left\nTry again"))
+                                        conn.send(str.encode("Incorrect Password\nYou have " + str(3-loginAttempt) + " attempts left\nRe-enter password"))
                                 else:
                                         conn.send(str.encode("Incorrect Password. YOU HAVE NO ATTEMPTS LEFT! YOU WILL BE DROPPED!!!!"))
                                         # TODO drop connection and Block user for BLOCK_TIME
@@ -54,7 +55,7 @@ def authenticateClient(conn, addr):
                                 else:
                                         uname = data
                                         recvdCorrectName = True
-                                        conn.send(str.encode("Enter password for " + data))
+                                        conn.send(str.encode("Password:").strip())
                         elif recvdCorrectName == False:
                                 conn.send(str.encode("User does not exist\nEnter correct username"))
 
@@ -79,28 +80,38 @@ def handleUser(conn, addr, uname):
                                         others = "\nThere is no one else here.\n"
                                 conn.send(str.encode(others))
                         elif command == "wholast":
-                                #get number: commands[1]
-                                #0 < number < 60
-                                #use timestamp and function that iterates through ActiveUsers and time they logged in
+                                # get number: commands[1]
+                                # 0 < number < 60
+                                # use timestamp and function that iterates through activeUsers and time they logged in
                                 print "wholast"
-
                         elif command == "broadcast":
-                                if commands[1] == "user":
-                                        msg = ""
-                                        for command in commands:
-                                                if users.has_key(command):
+                                if commands[1] == "user":           # broadcast to specific user set
+                                        msg = uname + ": "
+                                        doneAddingUsers = False
+                                        for i in range(2, len(commands)):    # check data for list of users
+                                                # print command
+                                                word = commands[i]
+                                                if word in activeUsers and doneAddingUsers == False:
+                                                        # if user, add to list
                                                         # broadcast to specific users
-                                                        broadcastTo.append(command)
-                                                else:
-                                                        msg += command + " "
-                                        if len(broadcastTo > 0):
+                                                        print word
+                                                        broadcastTo.append(word)
+                                                else:           # notice when done adding users and change boolean
+                                                    doneAddingUsers = True
+                                                # Now add all words to msg string. Even if the message includes another user's name
+                                                # it will be added to the broadcast message.
+                                                if doneAddingUsers is True:
+                                                        # No more users, now check for message
+                                                        msg += word + " "
 
+                                        if len(broadcastTo) > 0:
+                                                for person in broadcastTo:
+                                                        print broadcastTo
+                                                        activeUsers[person][0].send(str.encode(msg))
                                         else:
-                                                msg = "Incorrect usage of broadcast, please add a message after listing users\n"
+                                                msg = "Incorrect usage of broadcast, add a message after listing users\n"
                                                 conn.send(str.encode(msg))
-                                elif commands[1] == "message":
-                                        # broadcast to all
-
+                                elif commands[1] == "message":      # broadcast to all
                                         # create message
                                         msg = str(uname + ": ")
                                         for x in range(2, len(commands)):
@@ -108,22 +119,31 @@ def handleUser(conn, addr, uname):
 
                                         for user in activeUsers:
                                                 # user[0].send(str.encode(msg))
-
-                                                activeUsers[user][0].send(str.encode(msg))
+                                                if user is not uname:
+                                                        activeUsers[user][0].send(str.encode(msg))
                                 else:
                                         msg = "Incorrect use of broadcast\n"
-                                        msg = msg + "broa"
-                                        conn.send(str.encode("Incorrect usage of broadcast\nBroadcast + message"))
+                                        msg = msg + "broadcast to all = broadcast message 'message'\n"
+                                        msg = msg + "broadcast to specific users = broadcast user user 'message'\n"
+                                        msg = msg + "You can add as many users as you want, as long as they are active\n"
+                                        msg = msg + "and as long as their is at least one user"
+                                        conn.send(str.encode(msg))
                         elif command == "message":
                                 # create message for specific user
                                 msg = str(uname + ": ")
                                 for x in range(2, len(commands)):
                                         msg += commands[x] + " "
                                 target = commands[1]
-                                activeUsers[target][0].send(str.encode(msg))
+                                if target in activeUsers:
+                                        activeUsers[target][0].send(str.encode(msg))
+                                else:
+                                        conn.send(str.encode(target + " is not logged in currently."))
                         elif command == "logout":
                                 del activeUsers[uname]
                                 conn.send(str.encode("LOGOUT"))
+                                thread.exit()
+                        elif command == "SHUT_DOWN":
+                                del activeUsers[uname]
                                 thread.exit()
                         else:
                                 conn.send(str.encode("Error: %s is not a valid command\nEnter 'help' for a list of valid commands" % command))
@@ -135,15 +155,33 @@ def signal_handler(signal, frame):
                 for client in activeUsers:
                         msg = "SERVER_SHUTDOWN"
                         activeUsers[client][0].send(str.encode(msg))
-                        print "User: %s has been logged out" % activeUsers[client]
-                # For clients that haven't been
-                for client in clients:
-                        msg = "SERVER_SHUTDOWN"
+                        print "User: %s has been logged out" % client
+        # For clients that logged in yet
+        for client in clients:
+                msg = "SERVER_SHUTDOWN"
+                try:
                         client.send(str.encode(msg))
+                except socket.error, e:
+                        if isinstance(e.args, tuple):
+                                print "errno is %d" % e[0]
+                                if e[0] == errno.EPIPE:
+                                        # remote peer disconnected
+                                        print "Detected remote disconnect"
+                                else:
+                                        # determine and handle different error
+                                        pass
+                        else:
+                                print "socket error ", e
+                                remote.close()
+                                break
+                except IOError, e:
+                        print "IOError:, ", e
+                        break
         sys.exit(0)
 signal.signal(signal.SIGINT, signal_handler)
-# signal.pause()
 
+if not sys.argv[1]:
+        print "Incorrect usage"
 
 # Read list of username-password combinations
 f = open("user_pass.txt", "r")
