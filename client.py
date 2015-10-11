@@ -15,8 +15,8 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 timeout = 0
-port = int(sys.argv[1])
-host = socket.gethostname()
+host = sys.argv[1]
+port = int(sys.argv[2])
 server_address = (host, port)
 
 # Create socket
@@ -28,14 +28,14 @@ sock.connect(server_address)
 loggedIn = False
 
 while 1:
-
-    # if loggedIn:
-    #         sys.stdout.write("Command: ")
-    # sys.stdout.flush()
+    if loggedIn:
+            sys.stdout.write("Command: ")
+    sys.stdout.flush()
     (sread, swrite, sexc) = select.select([0, sock], [],[])
     for s in sread:
         if s == 0:
             data = sys.stdin.readline().strip()
+
             if data:
                 sock.sendall(data)
     	elif s == sock:
@@ -50,10 +50,10 @@ while 1:
                     else:
                         # determine and handle different error
                         pass
-            else:
-                print "socket error ", e
-                remote.close()
-                break
+                else:
+                    print "socket error ", e
+                    remote.close()
+                    break
             except IOError, e:
                 print "IOError:, ", e
                 break
@@ -68,11 +68,13 @@ while 1:
                         sys.exit()
                         break
                 elif data == "SERVER_SHUTDOWN":
-                    print "Server shutting down\nYou have been logged out."
+                    print "\nServer shutting down\nYou have been logged out."
+                    sock.send("SHUT_DOWN")
                     sock.close()
                     sys.exit()
                 elif data == "LOGOUT":
-                    print "You are successfully logged out"
+                    print "\nYou have successfully logged out"
+                    sock.send("SHUT_DOWN")
                     sock.close()
                     sys.exit()
                 elif data == "INACTIVE":
@@ -85,10 +87,14 @@ while 1:
                     sys.stdout.flush()
                 elif data == "You have logged in. Welcome!":
                     data = str(data).strip() + " "
-                    sys.stdout.write(data + '\nCommand: ')
+                    sys.stdout.write(data + '\n')
                     sys.stdout.flush()
                     loggedIn = True
-                else:
-                    sys.stdout.write('\n' + data + '\nCommand: ')
+                elif loggedIn == True:
+                    sys.stdout.write(data)
                     sys.stdout.flush()
+                else:
+                    sys.stdout.write(data)
+                    sys.stdout.flush()
+
 sock.close()
