@@ -19,9 +19,10 @@ def authenticateClient(conn, addr):
         # Check how long since the user has been blocked
         now = time.time()
         timeBlocked = blockedClients[addr[0]]
-        if timeBlocked - time <= BLOCK_TIME:
+        if now - int(timeBlocked) <= BLOCK_TIME:
             # User is still blocked
-            conn.send("You are currently blocked\n")
+            conn.send("\nYou are currently blocked\n")
+            conn.send("BLOCKED")
         else:
             del blockedClients[addr[0]]
     uname = ""
@@ -35,24 +36,14 @@ def authenticateClient(conn, addr):
 
     while 1:
         data = conn.recv(1024)
+
         # print "\n DATA RECEIVED " + data + " END TRANSMISSION\n"
         if not data:
             break
         else:
             data = str(data)
             timeSinceLastMessage[conn] = timeSinceLastMessage[conn] = time.time()
-            if numFailures >= 3:
-                # TODO drop connection and Block user for BLOCK_TIME
-                # Drop connection
-                conn.send(str.encode("Incorrect Password. YOU HAVE NO ATTEMPTS LEFT! YOU WILL BE DROPPED!!!!"))
-                blockedClients[addr[0]] = time.time()
-                conn.close()
-                del clients[conn]
-
-                thread.exit()
-
-                conn.send(str.encode("Incorrect Password. YOU HAVE NO ATTEMPTS LEFT! YOU WILL BE DROPPED!!!!"))
-            elif data == "SHUT_DOWN":
+            if data == "SHUT_DOWN":
                 conn.close()
                 print addr[0] + " : " + str(addr[1]) + " Shut Down"
                 thread.exit()
@@ -77,9 +68,20 @@ def authenticateClient(conn, addr):
                     numFailures += 1
                 elif password != str(users.get(uname)):
                     # Password incorrect
-                    msg = "Incorrect Password\nYou have " + str(3-numFailures) + " attempts left\nUsername: "
-                    conn.send(str.encode(msg))
                     numFailures += 1
+                    if numFailures > 2:
+                        # TODO drop connection and Block user for BLOCK_TIME
+                        # Drop connection
+                        conn.send(str.encode("Incorrect Password.\nYOU HAVE NO ATTEMPTS LEFT!\nYOU ARE BLOCKED FOR " + str(BLOCK_TIME) + " SECONDS!\n"))
+                        conn.send("BLOCK")
+                        blockedClients[addr[0]] = time.time()
+                        conn.close()
+                        del clients[conn]
+                        thread.exit()
+                    else:
+                        msg = "Incorrect Password\nYou have " + str(3-numFailures) + " attempts left\nUsername: "
+                        conn.send(str.encode(msg))
+
                 else:
                     # Password correct, log in user
                     conn.send(str.encode("You have logged in. Welcome!"))
@@ -335,13 +337,17 @@ thread.start_new_thread(monitorActivity, (a, b))
 
 while 1:
     # accept new client
-    try:
-        conn, addr = server.accept()
-    except:
-        sys.exit()
-    # Add client to list of clients
+    # try:
+    conn, addr = server.accept()
+    print "test"
+    # except:
+    #     sys.exit()
+    # # Add client to list of clients
     clients[conn] = addr
-    # Spawn a new thread to handle client
-    thread.start_new_thread(authenticateClient, (conn, addr))
+
+    if conn:
+        # Spawn a new thread to handle client
+        print "test"
+        thread.start_new_thread(authenticateClient, (conn, addr))
 
 server.close()
