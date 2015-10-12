@@ -15,7 +15,7 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 timeout = 0
-# host = sys.argv[1]
+host = sys.argv[1]
 # host = socket.gethostname()
 port = int(sys.argv[2])
 server_address = (host, port)
@@ -23,8 +23,8 @@ server_address = (host, port)
 # Create socket
 sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # Connect to server port
-
 sock.connect(server_address)
+
 # print "Connected to Server at %s" % server_address
 
 loggedIn = False

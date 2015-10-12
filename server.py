@@ -331,7 +331,7 @@ except:
 
 server.listen(10)
 
-print "\n\nWaiting for connections on port %s" % (port)
+print "Waiting for connections on port %s" % (port)
 
 thread.start_new_thread(monitorActivity, (a, b))
 
@@ -339,7 +339,6 @@ while 1:
     # accept new client
     # try:
     conn, addr = server.accept()
-    print "test"
     # except:
     #     sys.exit()
     # # Add client to list of clients
@@ -347,7 +346,6 @@ while 1:
 
     if conn:
         # Spawn a new thread to handle client
-        print "test"
         thread.start_new_thread(authenticateClient, (conn, addr))
 
 server.close()
