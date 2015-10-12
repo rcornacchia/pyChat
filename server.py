@@ -208,7 +208,7 @@ def handleUser(conn, addr, uname):
                 if target in activeUsers:
                     activeUsers[target][0].send(str.encode(msg))
                 else:
-                    conn.send(str.encode(target + " is not logged in currently."))
+                    conn.send(str.encode(target + " is not logged in currently.\n"))
             elif command == "logout":
                 del activeUsers[uname]
                 logoutRecord[uname] = time.time()

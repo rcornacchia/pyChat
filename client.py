@@ -15,7 +15,7 @@ def signal_handler(signal, frame):
 signal.signal(signal.SIGINT, signal_handler)
 
 timeout = 0
-host = sys.argv[1]
+# host = sys.argv[1]
 # host = socket.gethostname()
 port = int(sys.argv[2])
 server_address = (host, port)
@@ -97,7 +97,7 @@ while 1:
                     sys.stdout.flush()
                     loggedIn = True
                 elif loggedIn == True:
-                    sys.stdout.write(data)
+                    sys.stdout.write(data + "\n")
                     sys.stdout.flush()
                 else:
                     sys.stdout.write(data)
