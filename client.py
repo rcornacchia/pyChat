@@ -62,13 +62,11 @@ while 1:
             else:
                 # data = sock.recv(1024)
                 if not data:
-                    timeout += 1
-                    if timeout > 10:
-                        sock.send(str.encode("LOGOUT"))
-                        print("\nServer not responding\nShutting Down")
-                        sock.close()
-                        sys.exit()
-                        break
+                    sock.send(str.encode("LOGOUT"))
+                    print("Server shut down\nClient shutting down\n")
+                    sock.close()
+                    sys.exit()
+                    break
                 elif data == "SERVER_SHUTDOWN":
                     print "\nServer shutting down\nYou have been logged out."
                     sock.send("SHUT_DOWN")
@@ -87,20 +85,24 @@ while 1:
                     print "\nDue to being blocked, server no longer responding. Server shutting down."
                     sock.close()
                     sys.exit()
+                elif data == "KICKED":
+                    print "\nYou have been kicked"
+                    sock.close()
+                    sys.exit
                 elif data == "Username:" or data == "Password:":
                     data = str(data).strip() + " "
                     sys.stdout.write(data)
                     sys.stdout.flush()
-                elif data == "You have logged in. Welcome!":
+                elif data == "LOGGED_IN":
                     data = str(data).strip() + " "
-                    sys.stdout.write(data + '\n')
+                    sys.stdout.write("\nYou have logged in. Welcome!\n")
                     sys.stdout.flush()
                     loggedIn = True
                 elif loggedIn == True:
-                    sys.stdout.write(data + "\n")
+                    sys.stdout.write("\n" + data + "\n")
                     sys.stdout.flush()
                 else:
-                    sys.stdout.write(data)
+                    sys.stdout.write("\n" + data)
                     sys.stdout.flush()
 
 sock.close()

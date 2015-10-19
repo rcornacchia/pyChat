@@ -84,7 +84,7 @@ def authenticateClient(conn, addr):
 
                 else:
                     # Password correct, log in user
-                    conn.send(str.encode("You have logged in. Welcome!"))
+                    conn.send("LOGGED_IN")
                     # Move client from clients dict to activeUsers dict
                     del clients[conn]
                     activeUsers[uname] = [conn, addr]
@@ -94,22 +94,27 @@ def authenticateClient(conn, addr):
 
 def handleUser(conn, addr, uname):
     while 1:
+        if uname in missedMessages.keys():
+            msg = "\nYou missed the following messages while offline: \n"
+            msg += missedMessages[uname]
+            conn.send(str.encode(msg))
         # Broadcast user has logged in
         data = conn.recv(1024)
         data = str(data)
+
         if not data:
-            # print "Broken pipe"
-            # if len(activeUsers) is not 0:
-            #         for client in activeUsers:
-            #                 msg = "SERVER_SHUTDOWN"
-            #                 activeUsers[client][0].send(str.encode(msg))
-            #                 print "User: %s has been logged out" % client
-            # # For clients that logged in yet
-            # for client in clients:
-            #         msg = "SERVER_SHUTDOWN"
-            #         client.send(str.encode(msg))
-            # conn.close()
-            # sys.exit()
+            # Implies broken pipe
+            if len(activeUsers) is not 0:
+                    for client in activeUsers:
+                            msg = "SERVER_SHUTDOWN"
+                            activeUsers[client][0].send(str.encode(msg))
+                            print "User: %s has been logged out" % client
+            # For clients that haven't logged in yet
+            for client in clients:
+                    msg = "SERVER_SHUTDOWN"
+                    client.send(str.encode(msg))
+            conn.close()
+            sys.exit()
             break
         else:
             timeSinceLastMessage[conn] = time.time()
@@ -146,13 +151,13 @@ def handleUser(conn, addr, uname):
                         diff = now - logoutRecord[client]
                         if diff <= duration and client not in recentlyActive:
                             recentlyActive.append(client)
-                    if len(recentlyActive) == 0:
-                        conn.send(str.encode("No one else has been active in the past " + durationInMinutes + " minutes."))
+                    if len(recentlyActive) == 1:
+                        conn.send(str.encode("\nNo one else has been active in the past " + durationInMinutes + " minutes."))
                     else:
                         msg = ""
                         for name in recentlyActive:
                             if name is not uname:
-                                msg += str(name) + "\n"
+                                msg += "\n" + str(name) + "\n"
                         conn.send(str.encode(msg).strip())
             elif command == "broadcast":
                 if commands[1] == "user":           # broadcast to specific user set
@@ -205,20 +210,43 @@ def handleUser(conn, addr, uname):
                     msg += commands[x] + " "
                 msg += "\n"
                 target = commands[1]
+
                 if target in activeUsers:
                     activeUsers[target][0].send(str.encode(msg))
                 else:
-                    conn.send(str.encode(target + " is not logged in currently.\n"))
+                    conn.send(str.encode("\n" + target + " is not logged in currently.\nHe/she will receive the message when he logs in\n"))
+                    if target in missedMessages.keys():
+                        msg += missedMessages[target]
+                    missedMessages[target] = msg
             elif command == "logout":
                 del activeUsers[uname]
                 logoutRecord[uname] = time.time()
                 conn.send(str.encode("LOGOUT"))
                 thread.exit()
+            elif command == "block":
+                if len(commands) == 2:
+                    blockedUser = commands[1]
+                    if blockedUser in activeUsers.keys():
+                        t = activeUsers[blockedUser][0]
+                        t.send(str.encode("KICKED"))
+                    else:
+                        conn.send("\nUser is not active")
+                else:
+                    conn.send("Incorrect usage of block\nCorrect usage: block <user>")
+            elif command == "help":
+                msg = "\nAvailable commands are:\nwhoelse\n"
+                msg += "wholast <number>\n"
+                msg += "broadcast message <message>\n"
+                msg += "broadcast user <user> <user> ... <user> message <message>\n"
+                msg += "message <user> <message>\n"
+                msg += "logout\nblock <user>"
+                conn.send(msg)
             elif command == "SHUT_DOWN":
                 del activeUsers[uname]
                 logoutRecord[uname] = time.time()
                 print "User: " + uname + " at " + addr[0] + " : " + str(addr[1]) + " Shut Down"
                 thread.exit()
+
             else:
                 conn.send(str.encode("Error: %s is not a valid command\nEnter 'help' for a list of valid commands" % command))
 
@@ -249,7 +277,7 @@ def monitorActivity(a, b):
 def signal_handler(signal, frame):
     print '\nYou pressed Ctrl+C!\nServer Shutting Down\n'
     if len(activeUsers) is not 0:
-        for client in activeUsers:
+        for client in allUsers:
             msg = "SERVER_SHUTDOWN"
             activeUsers[client][0].send(str.encode(msg))
             print "User: %s has been logged out" % client
@@ -301,6 +329,8 @@ for i in slices:
 
 BLOCK_TIME = 60
 
+a = 0
+b = 0
 # Create a dict of all users that are logged in
 activeUsers = {}
 # Create a dict of all clients, that maintains the socket until they log in
@@ -311,13 +341,13 @@ logoutRecord = {}
 timeSinceLastMessage = {}
 # Dictionary that records blocked users and time they are blocked. Key = IP addr, Value = time blocked
 blockedClients = {}
+# Dictionary that records missed messages for each user. Key = username, Value = missed messages
+missedMessages = {}
 
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 # server.setblocking(0)
 
-a = 0
-b = 0
 
 host = socket.gethostname()
 port = int(sys.argv[1])
@@ -338,14 +368,15 @@ thread.start_new_thread(monitorActivity, (a, b))
 while 1:
     # accept new client
     # try:
-    conn, addr = server.accept()
-    # except:
-    #     sys.exit()
-    # # Add client to list of clients
+    try:
+        conn, addr = server.accept()
+    except:
+        sys.exit()
+    # Add client to list of clients
     clients[conn] = addr
 
-    if conn:
-        # Spawn a new thread to handle client
-        thread.start_new_thread(authenticateClient, (conn, addr))
+    # if conn:
+    #     # Spawn a new thread to handle client
+    thread.start_new_thread(authenticateClient, (conn, addr))
 
 server.close()
